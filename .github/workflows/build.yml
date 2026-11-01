@@ -68,12 +68,34 @@ jobs:
             # self-signed root with trust restricted to the code-signing policy.
             security find-certificate -a -p "$KEYCHAIN" > "$RUNNER_TEMP/code-signing-cert.pem"
             test -s "$RUNNER_TEMP/code-signing-cert.pem"
-            security add-trusted-cert -r trustRoot -p codeSign \
-              -k "$KEYCHAIN" "$RUNNER_TEMP/code-signing-cert.pem"
+            # Trust settings in unattended macOS runners require admin scope.
+            # Restrict this to the codeSign policy; never trust SSL/email use.
+            # A hard timeout prevents an authorization dialog hanging CI forever.
+            python3 - "$KEYCHAIN" "$RUNNER_TEMP/code-signing-cert.pem" <<'PY'
+          import subprocess
+          import sys
+
+          try:
+              subprocess.run(
+                  ["sudo", "-n", "security", "add-trusted-cert",
+                   "-d", "-r", "trustRoot", "-p", "codeSign",
+                   "-k", sys.argv[1], sys.argv[2]],
+                  check=True,
+                  timeout=45,
+              )
+          except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+              print(f"::error::Cannot configure self-signed code-signing trust: {error}", flush=True)
+              sys.exit(1)
+          PY
             rm -f "$RUNNER_TEMP/code-signing-cert.pem" "$RUNNER_TEMP/certificate.p12"
 
-            # Verify the keychain actually contains the expected signing identity.
-            security find-identity -v -p codesigning "$KEYCHAIN" | grep -Fq "$SIGN_IDENTITY"
+            # Explain any identity mismatch rather than failing an opaque grep.
+            identities="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+            if ! printf '%s\\n' "$identities" | grep -Fq "$SIGN_IDENTITY"; then
+              echo "$identities"
+              echo "::error::Expected signing identity is not trusted or doesn't match SMALLTOOLS_SIGN_IDENTITY."
+              exit 1
+            fi
             for dylib in "$APP"/Contents/MacOS/*.dylib; do
               if test -f "$dylib"; then
                 codesign --force --options runtime --timestamp=none \
