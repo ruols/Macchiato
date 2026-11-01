@@ -59,10 +59,10 @@ final class KeyboardLockManager {
             return
         }
 
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, kCFRunLoopCommonModes)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, CFRunLoopMode.commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         guard CGEvent.tapIsEnabled(tap: tap) else {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, kCFRunLoopCommonModes)
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, CFRunLoopMode.commonModes)
             CFMachPortInvalidate(tap)
             lastError = "The keyboard event tap was not enabled."
             return
@@ -121,7 +121,7 @@ final class KeyboardLockManager {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = eventTapSource {
-                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, kCFRunLoopCommonModes)
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, CFRunLoopMode.commonModes)
             }
             CFMachPortInvalidate(tap)
         }
