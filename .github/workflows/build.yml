@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -15,5 +19,63 @@ jobs:
       - uses: actions/checkout@v4
       - name: Show Xcode version
         run: xcodebuild -version
-      - name: Build
-        run: xcodebuild -project Macchiato.xcodeproj -scheme Macchiato -configuration Debug build CODE_SIGNING_ALLOWED=NO
+
+      - name: Build macOS app
+        run: |
+          xcodebuild \
+            -project Macchiato.xcodeproj \
+            -scheme Macchiato \
+            -configuration Debug \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath "$RUNNER_TEMP/MacchiatoBuild" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      # Developer ID signing / notarization requires the owner's certificate.
+      # This ad-hoc signed build is provided only for local testing.
+      - name: Ad-hoc sign test app
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/MacchiatoBuild/Build/Products/Debug/Macchiato.app"
+          HELPER="$APP/Contents/MacOS/app.macchiato.Macchiato.PowerHelper"
+          test -d "$APP"
+          test -x "$HELPER"
+          codesign --force --sign - "$HELPER"
+          codesign --force --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+      - name: Package downloadable app and DMG
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/MacchiatoBuild/Build/Products/Debug/Macchiato.app"
+          mkdir -p dist "$RUNNER_TEMP/MacchiatoDMG"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "dist/Macchiato-Keyboard-Cleaning-macos.zip"
+          ditto "$APP" "$RUNNER_TEMP/MacchiatoDMG/Macchiato.app"
+          ln -s /Applications "$RUNNER_TEMP/MacchiatoDMG/Applications"
+          hdiutil create -volname Macchiato -srcfolder "$RUNNER_TEMP/MacchiatoDMG" -ov -format UDZO "dist/Macchiato-Keyboard-Cleaning-macos.dmg"
+          hdiutil verify "dist/Macchiato-Keyboard-Cleaning-macos.dmg"
+          cat > dist/READ-ME-FIRST.txt <<'EOF'
+          Macchiato Keyboard Cleaning - TEST BUILD
+          Minimum macOS version: 14.0.
+
+          This is an ad-hoc signed test build, not a Developer ID signed or notarized release.
+          macOS Gatekeeper may require you to approve the app through
+          System Settings > Privacy & Security > Open Anyway.
+
+          Keyboard Cleaning requests Accessibility permission and automatically unlocks
+          after 60 seconds. Mouse and trackpad input remain available.
+
+          IMPORTANT: Keep Awake relies on a privileged SMAppService LaunchDaemon helper.
+          Ad-hoc signing may prevent macOS from registering this helper, so
+          system-wide / lid-closed sleep prevention is NOT guaranteed in this test build.
+          A properly signed release requires a Developer ID certificate.
+          EOF
+
+      - name: Upload installable test app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Macchiato-macOS-App
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
