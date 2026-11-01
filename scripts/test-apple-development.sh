@@ -58,7 +58,8 @@ for dylib in "$APP"/Contents/MacOS/*.dylib; do
     codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$dylib"
   fi
 done
-codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$HELPER"
+codesign --force --options runtime --timestamp=none \
+  --identifier "app.macchiato.Macchiato.PowerHelper" --sign "$IDENTITY" "$HELPER"
 codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign --verify --strict --verbose=2 "$HELPER"
