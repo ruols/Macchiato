@@ -57,21 +57,21 @@ struct MenuView: View {
             }
 
             Divider()
-            quitButton
+            HStack {
+                Spacer()
+                quitButton
+            }
         }
         .padding(16)
         .frame(width: 320)
     }
 
-    @ViewBuilder
     private var controls: some View {
-        if #available(macOS 26.0, *) {
-            controlRows
-                .padding(14)
-                .glassEffect(.regular, in: .rect(cornerRadius: 18))
-        } else {
-            controlRows.padding(14)
-        }
+        // The system already provides the native Liquid Glass window.
+        // Do not add a second glass surface around the switches.
+        controlRows
+            .padding(.horizontal, 2)
+            .padding(.vertical, 8)
     }
 
     private var controlRows: some View {
@@ -102,16 +102,7 @@ struct MenuView: View {
         }
     }
 
-    @ViewBuilder
     private var quitButton: some View {
-        if #available(macOS 26.0, *) {
-            quitAction.buttonStyle(.glass).controlSize(.small)
-        } else {
-            quitAction.buttonStyle(.bordered).controlSize(.small)
-        }
-    }
-
-    private var quitAction: some View {
         Button {
             Task {
                 keyboard.unlock()
@@ -119,10 +110,15 @@ struct MenuView: View {
                 if !power.isActive { NSApplication.shared.terminate(nil) }
             }
         } label: {
-            Label("退出小工具", systemImage: "power")
-                .frame(maxWidth: .infinity)
+            Image(systemName: "power")
+                .font(.system(size: 16, weight: .regular))
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .keyboardShortcut("q")
+        .accessibilityLabel("退出小工具")
+        .help("退出小工具")
     }
 
     private var needsHelperApproval: Bool {
