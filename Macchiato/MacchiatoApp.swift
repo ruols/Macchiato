@@ -18,5 +18,10 @@ struct MacchiatoApp: App {
         // The native menu-bar window supports real switches.
         // Menu style would display checkmarks instead.
         .menuBarExtraStyle(.window)
+
+        Settings {
+            HelperSettingsView()
+                .environment(power)
+        }
     }
 }

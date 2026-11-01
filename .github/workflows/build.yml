@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main, feature/keyboard-cleaning]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -34,25 +35,62 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      # Developer ID signing / notarization requires the owner's certificate.
-      # This ad-hoc signed build is provided only for local testing.
-      - name: Ad-hoc sign test app
+      # Use a persistent certificate identity for updates. Store the PKCS#12
+      # and its password in GitHub Actions Secrets; never commit the private key.
+      # Without both Secrets, generate a clearly labeled ad-hoc test build.
+      - name: Sign app and bundled helper
+        env:
+          CERT_P12_BASE64: ${{ secrets.SMALLTOOLS_CERT_P12_BASE64 }}
+          CERT_P12_PASSWORD: ${{ secrets.SMALLTOOLS_CERT_P12_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.SMALLTOOLS_SIGN_IDENTITY }}
         run: |
           set -euo pipefail
           APP="$RUNNER_TEMP/MacchiatoBuild/Build/Products/Debug/Macchiato.app"
           HELPER="$APP/Contents/MacOS/app.macchiato.Macchiato.PowerHelper"
           test -d "$APP"
           test -x "$HELPER"
-          # Xcode Debug builds embed multiple dylibs, including
-          # Macchiato.debug.dylib and __preview.dylib.
-          # Sign all embedded dylibs before sealing the outer app.
-          for dylib in "$APP"/Contents/MacOS/*.dylib; do
-            if test -f "$dylib"; then
-              codesign --force --sign - "$dylib"
-            fi
-          done
-          codesign --force --sign - "$HELPER"
-          codesign --force --sign - "$APP"
+
+          if [[ -n "$CERT_P12_BASE64" && -n "$CERT_P12_PASSWORD" && -n "$SIGN_IDENTITY" ]]; then
+            echo "Signing with configured persistent certificate."
+            KEYCHAIN="$RUNNER_TEMP/smalltools-build.keychain-db"
+            KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+            printf '%s' "$CERT_P12_BASE64" | base64 -D > "$RUNNER_TEMP/certificate.p12"
+            security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN"
+            security list-keychains -d user -s "$KEYCHAIN"
+            security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" \
+              -P "$CERT_P12_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: \
+              -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+            rm -f "$RUNNER_TEMP/certificate.p12"
+
+            # Verify the keychain actually contains the expected signing identity.
+            security find-identity -v -p codesigning "$KEYCHAIN" | grep -Fq "$SIGN_IDENTITY"
+            for dylib in "$APP"/Contents/MacOS/*.dylib; do
+              if test -f "$dylib"; then
+                codesign --force --options runtime --timestamp=none \
+                  --sign "$SIGN_IDENTITY" --keychain "$KEYCHAIN" "$dylib"
+              fi
+            done
+            codesign --force --options runtime --timestamp=none \
+              --sign "$SIGN_IDENTITY" --keychain "$KEYCHAIN" "$HELPER"
+            codesign --force --options runtime --timestamp=none \
+              --sign "$SIGN_IDENTITY" --keychain "$KEYCHAIN" "$APP"
+            codesign -dv --verbose=2 "$APP" 2>&1 | grep -E 'Authority=|TeamIdentifier=' || true
+          elif [[ -z "$CERT_P12_BASE64" && -z "$CERT_P12_PASSWORD" && -z "$SIGN_IDENTITY" ]]; then
+            echo "::warning::No persistent signing certificate. Ad-hoc builds may lose Accessibility permission after updates."
+            for dylib in "$APP"/Contents/MacOS/*.dylib; do
+              if test -f "$dylib"; then
+                codesign --force --sign - "$dylib"
+              fi
+            done
+            codesign --force --sign - "$HELPER"
+            codesign --force --sign - "$APP"
+          else
+            echo "::error::Incomplete signing Secrets. Set all three SMALLTOOLS_CERT_P12_BASE64, SMALLTOOLS_CERT_P12_PASSWORD and SMALLTOOLS_SIGN_IDENTITY."
+            exit 1
+          fi
           codesign --verify --deep --strict --verbose=2 "$APP"
 
       - name: Package downloadable app and DMG
@@ -68,7 +106,7 @@ jobs:
           hdiutil verify "dist/小工具.dmg"
           rm -rf "dist/小工具.app"
           cat > dist/READ-ME-FIRST.txt <<'EOF'
-          小工具 v1.1.0 (2) - TEST BUILD
+          小工具 v1.1.1 (3) - TEST BUILD
           Minimum macOS version: 14.0.
 
           This is an ad-hoc signed test build, not a Developer ID signed or notarized release.
@@ -94,9 +132,9 @@ jobs:
           compression-level: 0
 
   release:
-    name: Publish v1.1.0 prerelease
+    name: Publish tagged prerelease
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/keyboard-cleaning'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -106,41 +144,25 @@ jobs:
         with:
           name: SmallTools-macOS-App
           path: dist
-      - name: Publish signed-test release assets
+      - name: Publish new tag (never overwrite an existing Release)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          tag="$GITHUB_REF_NAME"
           test -f "dist/小工具.dmg"
           test -f "dist/小工具-macos.zip"
-          # GitHub sanitizes non-ASCII Release asset names. Keep the app's
-          # localized name inside the package, but publish ASCII file names.
-          cp "dist/小工具.dmg" "dist/SmallTools-v1.1.0-macOS.dmg"
-          cp "dist/小工具-macos.zip" "dist/SmallTools-v1.1.0-macOS.zip"
-
-          if gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            if ! gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
-                 grep -Fxq "SmallTools-v1.1.0-macOS.dmg"; then
-              gh release upload "v1.1.0" \
-                "dist/SmallTools-v1.1.0-macOS.dmg" \
-                "dist/SmallTools-v1.1.0-macOS.zip" \
-                --repo "$GITHUB_REPOSITORY"
-            fi
-            gh release edit "v1.1.0" --repo "$GITHUB_REPOSITORY" --notes-file RELEASE_NOTES.md
-            # Remove only the misnamed files after the replacements uploaded.
-            for old_asset in "default.dmg" "-macos.zip"; do
-              if gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
-                   grep -Fxq -- "$old_asset"; then
-                gh release delete-asset "v1.1.0" --repo "$GITHUB_REPOSITORY" --yes -- "$old_asset"
-              fi
-            done
-          else
-            gh release create "v1.1.0" \
-              "dist/SmallTools-v1.1.0-macOS.dmg" \
-              "dist/SmallTools-v1.1.0-macOS.zip" \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
-              --title "小工具 v1.1.0 (2)" \
-              --notes-file RELEASE_NOTES.md \
-              --prerelease
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $tag exists. Never overwrite a published version."
+            exit 1
           fi
+          cp "dist/小工具.dmg" "dist/SmallTools-${tag}-macOS.dmg"
+          cp "dist/小工具-macos.zip" "dist/SmallTools-${tag}-macOS.zip"
+          gh release create "$tag" \
+            "dist/SmallTools-${tag}-macOS.dmg" \
+            "dist/SmallTools-${tag}-macOS.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "小工具 ${tag}" \
+            --generate-notes \
+            --prerelease

@@ -56,6 +56,10 @@ If Macchiato is force-quit or crashes while enabled, you can manually restore no
 sudo pmset -a disablesleep 0
 ```
 
+## Helper 管理与签名
+
+进入「小工具」右上角齿轮设置，可查看 Power Helper 的状态，并安装或卸载。安装后可能需要在「系统设置 → 通用 → 登录项与扩展」批准。卸载时先恢复正常睡眠，并进行验证；键盘清洁模式不受影响。详情参阅 [SIGNING.md](SIGNING.md) 配置个人免费长期签名。
+
 ## 更新日志
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解各版本改动。

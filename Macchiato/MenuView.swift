@@ -3,6 +3,7 @@ import SwiftUI
 
 @MainActor
 struct MenuView: View {
+    @Environment(\.openSettings) private var openSettings
     @Environment(PowerManager.self) private var power
     @Environment(KeyboardLockManager.self) private var keyboard
 
@@ -33,6 +34,18 @@ struct MenuView: View {
                     .fontWeight(.semibold)
 
                 Spacer(minLength: 0)
+
+                Button {
+                    openSettings()
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 15))
+                        .frame(width: 28, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("设置")
+                .accessibilityLabel("打开设置")
 
                 quitButton
             }

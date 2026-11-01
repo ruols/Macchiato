@@ -1,6 +1,38 @@
 import Foundation
 import ServiceManagement
 
+enum PowerHelperRegistrationStatus: Equatable {
+    case enabled
+    case requiresApproval
+    case notInstalled
+    case unavailable
+
+    var title: String {
+        switch self {
+        case .enabled: return "已安装并启用"
+        case .requiresApproval: return "等待系统批准"
+        case .notInstalled: return "未安装"
+        case .unavailable: return "不可用"
+        }
+    }
+}
+
+enum PowerHelperManagementError: LocalizedError {
+    case busy
+    case sleepStillBlocked
+    case cannotVerifySleepState
+    case unsupportedState
+
+    var errorDescription: String? {
+        switch self {
+        case .busy: return "正在修改睡眠状态，请完成后再试。"
+        case .sleepStillBlocked: return "尚未成功恢复正常睡眠，已取消卸载，避免留下异常电源设置。"
+        case .cannotVerifySleepState: return "无法确认系统是否仍禁止睡眠，已取消卸载。请先检查 pmset 设置。"
+        case .unsupportedState: return "Helper 状态不可用。"
+        }
+    }
+}
+
 final class PowerHelperClient {
     static let shared = PowerHelperClient()
 
@@ -11,6 +43,70 @@ final class PowerHelperClient {
     private var connection: NSXPCConnection?
 
     private init() {}
+
+    var registrationStatus: PowerHelperRegistrationStatus {
+        switch service.status {
+        case .enabled: return .enabled
+        case .requiresApproval: return .requiresApproval
+        case .notRegistered, .notFound: return .notInstalled
+        @unknown default: return .unavailable
+        }
+    }
+
+    /// Register only when the user explicitly chooses Install in Settings.
+    func installHelper() throws {
+        try registerHelperIfNeeded()
+    }
+
+    /// Reset sleep settings before removing the system daemon registration.
+    /// Never auto-register the helper as a side effect of uninstalling.
+    func uninstallHelper() async throws {
+        switch service.status {
+        case .enabled:
+            try await setSleepDisabled(false)
+            guard try await !isSleepDisabled() else {
+                throw PowerHelperManagementError.sleepStillBlocked
+            }
+
+        case .requiresApproval:
+            // Service is not runnable. Verify the global setting through
+            // read-only pmset output rather than silently leaving sleep disabled.
+            guard try normalSleepIsAllowed() else {
+                throw PowerHelperManagementError.sleepStillBlocked
+            }
+
+        case .notRegistered, .notFound:
+            resetCurrentConnection()
+            return
+
+        @unknown default:
+            throw PowerHelperManagementError.unsupportedState
+        }
+
+        resetCurrentConnection()
+        try service.unregister()
+    }
+
+    private func normalSleepIsAllowed() throws -> Bool {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["-g", "live"]
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0,
+                  let output = String(data: outputData, encoding: .utf8) else {
+                throw PowerHelperManagementError.cannotVerifySleepState
+            }
+            return output.range(of: #"SleepDisabled\s+1"#, options: .regularExpression) == nil
+        } catch {
+            throw PowerHelperManagementError.cannotVerifySleepState
+        }
+    }
 
     func setSleepDisabled(_ disabled: Bool) async throws {
         try await performWithHelperConnection { connection in
@@ -87,46 +183,11 @@ final class PowerHelperClient {
     private func performWithHelperConnection<Value>(
         _ operation: (NSXPCConnection) async throws -> Value
     ) async throws -> Value {
-        try registerHelperIfNeeded()
-
-        do {
-            return try await operation(makeConnectionIfNeeded())
-        } catch {
-            guard shouldRefreshRegistration(after: error) else {
-                throw error
-            }
-
-            try refreshHelperRegistration(after: error)
-            return try await operation(makeConnectionIfNeeded())
+        // Explicit management: do not silently reinstall an uninstalled helper.
+        guard service.status == .enabled else {
+            throw PowerHelperClientError.requiresApprovalOrInstallation
         }
-    }
-
-    private func shouldRefreshRegistration(after error: Error) -> Bool {
-        guard let helperError = error as? PowerHelperClientError else {
-            return false
-        }
-
-        switch helperError {
-        case .timedOut, .unavailable:
-            return true
-        case .commandFailed, .notFound, .requiresApproval:
-            return false
-        }
-    }
-
-    private func refreshHelperRegistration(after originalError: Error) throws {
-        resetCurrentConnection()
-
-        do {
-            if service.status == .enabled || service.status == .requiresApproval {
-                try service.unregister()
-            }
-            try registerHelperIfNeeded()
-        } catch let helperError as PowerHelperClientError {
-            throw helperError
-        } catch {
-            throw originalError
-        }
+        return try await operation(makeConnectionIfNeeded())
     }
 
     private func registerHelperIfNeeded() throws {
@@ -261,6 +322,7 @@ private enum PowerHelperClientError: LocalizedError {
     case commandFailed(String?)
     case notFound
     case requiresApproval
+    case requiresApprovalOrInstallation
     case timedOut
     case unavailable
 
@@ -272,13 +334,15 @@ private enum PowerHelperClientError: LocalizedError {
             }
             return "Could not update lid-closed sleep setting."
         case .notFound:
-            return "Macchiato Helper is missing from the app bundle."
+            return "小工具 Power Helper is missing from the app bundle."
         case .requiresApproval:
-            return "Approve Macchiato Helper in System Settings, then try again."
+            return "请在系统设置中批准小工具 Power Helper，然后重试。"
+        case .requiresApprovalOrInstallation:
+            return "请先到小工具设置中安装并批准 Power Helper。"
         case .timedOut:
-            return "Macchiato Helper did not respond. Approve the helper in System Settings or relaunch Macchiato, then try again."
+            return "小工具 Power Helper did not respond. Approve the helper in System Settings or relaunch Macchiato, then try again."
         case .unavailable:
-            return "Macchiato Helper is unavailable."
+            return "小工具 Power Helper is unavailable."
         }
     }
 }

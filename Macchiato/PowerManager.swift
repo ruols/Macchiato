@@ -25,6 +25,29 @@ final class PowerManager {
         helper.openHelperApprovalSettings()
     }
 
+    var helperStatus: PowerHelperRegistrationStatus {
+        helper.registrationStatus
+    }
+
+    func installHelper() throws {
+        try helper.installHelper()
+    }
+
+    func uninstallHelper() async throws {
+        guard !isChanging else {
+            throw PowerHelperManagementError.busy
+        }
+
+        if isActive {
+            await disable()
+            guard !isActive else {
+                throw PowerHelperManagementError.sleepStillBlocked
+            }
+        }
+
+        try await helper.uninstallHelper()
+    }
+
     func enable() async {
         guard !isActive, !isChanging else { return }
 
