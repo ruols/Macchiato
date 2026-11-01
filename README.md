@@ -2,17 +2,17 @@
   <img src="Macchiato/Assets.xcassets/MacchiatoBase.imageset/macchiato-base.png" width="64" height="64" alt="Macchiato logo" />
 </p>
 
-<h1 align="center">Macchiato</h1>
+<h1 align="center">小工具（Macchiato Fork）</h1>
 
 <p align="center">
-  A tiny macOS menu bar utility that keeps your Mac awake with one button.
+  原生 macOS 菜单栏小工具：保持唤醒、键盘清洁模式。
 </p>
 
 ## What It Solves
 
 Mac-chiato is built for people who leave long-running work on their Mac: coding agents, local automation, builds, data jobs, model runs, downloads, and anything else that should keep going while you step away.
 
-![screenshot](docs/screenshot.png)
+> **注意：** 原仓库的截图展示的是旧版 Macchiato 界面；本分支已改为「小工具」原生开关界面。
 
 When you need to close your computer, you should be able to close it normally. No leaving the lid slightly open, no changing system settings by hand, and no wondering whether the agent that was halfway through a task got interrupted.
 
@@ -23,13 +23,13 @@ Macchiato gives you a single menu bar switch:
 
 ## How To Use
 
-1. Launch **Macchiato**.
-2. Click the menu bar icon.
-3. Turn on **Keep Awake** before starting or leaving a long-running task.
-4. Close the lid whenever you need to move, pause, or put the Mac aside.
-5. Turn **Keep Awake** off when you want macOS to sleep normally again.
+1. 从 [Releases](https://github.com/ruols/Macchiato/releases) 下载 **小工具.dmg**，拖动 App 到「应用程序」。
+2. 启动 **小工具**，点击菜单栏原有的咖啡杯图标。
+3. 使用原生开关操作 **保持唤醒** 或 **键盘清洁模式**。
+4. 键盘清洁模式首次使用需要 macOS 辅助功能权限，60 秒后自动解锁。
+5. 菜单右上角电源图标可退出；按下 `⌘Q` 也可退出。
 
-The first time Macchiato enables lid-closed sleep control, macOS may ask you to approve **Macchiato Helper** in System Settings. After that approval, the regular on/off switch should work without asking for administrator credentials every time.
+**发布状态：** v1.1.0 为临时（ad-hoc）签名的测试版，未经过 Apple Developer ID 签名与公证。系统级合盖防睡眠依赖特权 Macchiato Helper，在本测试包中**不保证注册成功**；如需可靠使用此功能，应在本机或发布流程中正确签名 App 与 Helper。
 
 ## Keyboard Cleaning
 
@@ -55,6 +55,10 @@ If Macchiato is force-quit or crashes while enabled, you can manually restore no
 ```sh
 sudo pmset -a disablesleep 0
 ```
+
+## 更新日志
+
+查看 [CHANGELOG.md](CHANGELOG.md) 了解各版本改动。
 
 ## Development
 

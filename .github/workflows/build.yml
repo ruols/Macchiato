@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/keyboard-cleaning]
   pull_request:
   workflow_dispatch:
 
@@ -68,7 +68,7 @@ jobs:
           hdiutil verify "dist/小工具.dmg"
           rm -rf "dist/小工具.app"
           cat > dist/READ-ME-FIRST.txt <<'EOF'
-          小工具 - TEST BUILD
+          小工具 v1.1.0 (2) - TEST BUILD
           Minimum macOS version: 14.0.
 
           This is an ad-hoc signed test build, not a Developer ID signed or notarized release.
@@ -92,3 +92,36 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+
+  release:
+    name: Publish v1.1.0 prerelease
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/keyboard-cleaning'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: SmallTools-macOS-App
+          path: dist
+      - name: Publish signed-test release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -f "dist/小工具.dmg"
+          test -f "dist/小工具-macos.zip"
+          if gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v1.1.0 already exists; no duplicate publish."
+            exit 0
+          fi
+          gh release create "v1.1.0" \
+            "dist/小工具.dmg" \
+            "dist/小工具-macos.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "小工具 v1.1.0 (2)" \
+            --notes-file RELEASE_NOTES.md \
+            --prerelease
