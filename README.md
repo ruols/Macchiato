@@ -31,6 +31,14 @@ Macchiato gives you a single menu bar switch:
 
 The first time Macchiato enables lid-closed sleep control, macOS may ask you to approve **Macchiato Helper** in System Settings. After that approval, the regular on/off switch should work without asking for administrator credentials every time.
 
+## Keyboard Cleaning
+
+Use **Keyboard Cleaning** from the menu bar to temporarily suppress keyboard input while you wipe the keys. Mouse and trackpad input still works: click the same control to unlock. As a safety fallback, the keyboard automatically unlocks after **60 seconds**.
+
+macOS requires **Accessibility** permission in **System Settings > Privacy & Security > Accessibility**. Without that permission, the feature will not activate. Keyboard Cleaning is independent of **Keep Awake** and does not use the privileged power helper.
+
+Ordinary typing, modifier keys, and many system-defined keyboard events are suppressed. Hardware-managed keys such as the power button or Touch ID may still respond. This is a cleaning convenience, not a security lock. If Macchiato quits or crashes, the operating system releases the event tap.
+
 ## Good For
 
 - Agents that continue working while you are away from the keyboard.

@@ -4,12 +4,15 @@ import SwiftUI
 @MainActor
 struct MenuView: View {
     @Environment(PowerManager.self) private var power
+    @Environment(KeyboardLockManager.self) private var keyboard
 
     var body: some View {
         VStack(spacing: 14) {
             header
             awakeToggle
+            keyboardToggle
             statusArea
+            keyboardStatus
             footer
         }
         .padding(16)
@@ -93,6 +96,87 @@ struct MenuView: View {
         .buttonStyle(.plain)
     }
 
+    private var keyboardToggle: some View {
+        Button {
+            if keyboard.isLocked {
+                keyboard.unlock()
+            } else {
+                keyboard.lock()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(keyboard.isLocked ? Color.brown.opacity(0.18) : Color.secondary.opacity(0.16))
+
+                    Image(systemName: keyboard.isLocked ? "keyboard.fill" : "keyboard")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(keyboard.isLocked ? Color.brown : Color.secondary)
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Keyboard Cleaning")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    Text(keyboard.isLocked ? "Keyboard temporarily locked" : "Disable typing while cleaning")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+
+                Spacer(minLength: 6)
+                TogglePill(isOn: keyboard.isLocked, isBusy: false)
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 88)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(keyboard.isLocked ? Color.brown.opacity(0.22) : Color.white.opacity(0.36))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.white.opacity(keyboard.isLocked ? 0.38 : 0.5), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
+            .animation(.easeInOut(duration: 0.22), value: keyboard.isLocked)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var keyboardStatus: some View {
+        if keyboard.isLocked {
+            HStack(spacing: 8) {
+                Image(systemName: "clock")
+                Text("Click to unlock or wait \(keyboard.secondsRemaining)s for automatic unlock.")
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 2)
+        } else if let lastError = keyboard.lastError {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text(lastError)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if keyboard.needsAccessibilityPermission {
+                    Button("Open Settings") {
+                        keyboard.openAccessibilitySettings()
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.red)
+            .padding(.horizontal, 2)
+        }
+    }
+
     private var statusArea: some View {
         HStack(spacing: 8) {
             Image(systemName: power.lastError == nil ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
@@ -149,6 +233,7 @@ struct MenuView: View {
 
             Button {
                 Task {
+                    keyboard.unlock()
                     await power.disable()
                     if !power.isActive {
                         NSApplication.shared.terminate(nil)

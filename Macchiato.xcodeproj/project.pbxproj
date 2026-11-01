@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		30A0000A0000000000000001 /* KeyboardLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A000010000000000000001 /* KeyboardLockManager.swift */; };
 		10A0000A0000000000000001 /* MacchiatoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A000010000000000000001 /* MacchiatoApp.swift */; };
 		10A0000A0000000000000002 /* PowerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A000010000000000000002 /* PowerManager.swift */; };
 		10A0000A0000000000000003 /* MenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A000010000000000000003 /* MenuView.swift */; };
@@ -28,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		30A000010000000000000001 /* KeyboardLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLockManager.swift; sourceTree = "<group>"; };
 		10A000010000000000000001 /* MacchiatoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacchiatoApp.swift; sourceTree = "<group>"; };
 		10A000010000000000000002 /* PowerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerManager.swift; sourceTree = "<group>"; };
 		10A000010000000000000003 /* MenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuView.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 				10A000010000000000000002 /* PowerManager.swift */,
 				20A000010000000000000001 /* PowerHelperClient.swift */,
 				10A000010000000000000003 /* MenuView.swift */,
+				30A000010000000000000001 /* KeyboardLockManager.swift */,
 				10A000010000000000000005 /* Assets.xcassets */,
 				10A000010000000000000004 /* Info.plist */,
 			);
@@ -230,6 +233,7 @@
 				20A0000A0000000000000001 /* PowerHelperClient.swift in Sources */,
 				20A0000A0000000000000002 /* PowerHelperProtocol.swift in Sources */,
 				10A0000A0000000000000003 /* MenuView.swift in Sources */,
+				30A0000A0000000000000001 /* KeyboardLockManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
