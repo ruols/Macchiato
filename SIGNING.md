@@ -1,6 +1,20 @@
 # 小工具：长期稳定签名
 
-目前仓库的默认 GitHub Actions 构建只有 **Ad-hoc 临时签名**。每次代码改变都会改变应用的代码身份，macOS TCC 可能要求重新授权键盘清洁模式使用的辅助功能。
+当前 GitHub Actions 支持固定自签名证书，未设置三项 Repository Secrets 时使用 Ad-hoc。需要注意：**自签名证书可用于普通 App，但在 macOS 上可能无法通过特权 LaunchDaemon 的启动约束校验。**
+
+## 使用现有免费 Apple Development 证书进行本机试验
+
+你的 Mac 已有 Apple Development 开发证书（SHA-1：`C20B41BD6C06968B7A8154A02A67D3EB2792295C`）。在本机运行：
+
+```bash
+bash scripts/test-apple-development.sh
+```
+
+它会使用本机 Keychain 中的身份编译 Release 并签名主 App、Power Helper，然后验证签名和 TeamIdentifier。输出到被 Git 忽略的 `dist/AppleDevelopmentLocal/`，**不导出任何证书、私钥或验证码，不修改 GitHub Secrets，也不覆盖旧 App**。证书到期或更换后可将新 SHA-1 作为第一个参数。
+
+如果 Xcode 提示 Apple ID 需要验证，在你自己的 Mac 的 **Xcode → 设置 → Accounts** 中操作即可。免费账号的描述文件可能有 7 天限制；Apple Development 证书有效期是另一个概念。
+
+请先退出旧版 App，备份旧 App 到 `/Applications` 以外的目录，尽量通过「设置 → 卸载 Helper」注销旧服务后再手动安装新 App 到 `/Applications/小工具.app`。新 App 上安装 Helper 后检查 `sudo launchctl print system/app.macchiato.Macchiato.PowerHelper` 和签名拒绝日志。**Apple Development 证书不是 Developer ID，能否通过特权服务校验需要实测。**
 
 ## 不付费的方案：固定的自签名代码签名证书
 

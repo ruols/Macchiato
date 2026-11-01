@@ -60,6 +60,19 @@ sudo pmset -a disablesleep 0
 
 进入「小工具」右上角齿轮设置，可查看 Power Helper 的状态，并安装或卸载。安装后可能需要在「系统设置 → 通用 → 登录项与扩展」批准。卸载时先恢复正常睡眠，并进行验证；键盘清洁模式不受影响。详情参阅 [SIGNING.md](SIGNING.md) 配置个人免费长期签名。
 
+## 使用 Apple Development 免费证书本机测试
+
+在自己的 Mac 上签名，不导出私钥、不把验证码交给任何人，也不会覆盖已安装的 App：
+
+```bash
+git checkout feature/keyboard-cleaning
+bash scripts/test-apple-development.sh
+```
+
+脚本默认使用现有 Apple Development 签名 SHA-1 `C20B41BD6C06968B7A8154A02A67D3EB2792295C`。若以后证书更新，可在命令后指定新证书 SHA-1。生成的独立 Release 测试 App 保存在 `dist/AppleDevelopmentLocal/`。安装前先退出并备份已有 App，在设置中注销旧 Helper（系统已允许正常睡眠时可以在无 XPC 响应的情况下安全注销）。将新的测试 App 安装到 `/Applications/小工具.app` 后，再从设置安装 Helper 并批准。
+
+此步骤只验证开发证书能否被 macOS 接受，不保证免费 Personal Team 一定支持特权 LaunchDaemon。详见 [SIGNING.md](SIGNING.md)。
+
 ## 更新日志
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解各版本改动。

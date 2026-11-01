@@ -2,6 +2,17 @@
 
 所有版本的显著改动记录于此。版本号遵循 `主版本.次版本.修订版本`。
 
+## [1.1.3] - 2026-11-01
+
+### 开发测试
+- 新增 `scripts/test-apple-development.sh`：直接使用 Mac 钥匙串里现有的免费 Apple Development 证书，本机一致签署主 App 和 Power Helper。
+- 测试包独立保存，不自动覆盖已安装 App，也不将私钥或验证码发送到 GitHub。
+- 修复 Helper 已注册但启动失败时无法卸载的问题：若只读 `pmset` 已确认系统允许睡眠，可安全注销，不再必须等待无法启动的 Helper 回复。
+- 版本更新至 1.1.3 (5)。
+
+### 说明
+- GitHub Actions 的既有固定自签名配置不变。Apple Development 证书仅用于本机试验，仍需实机确认是否满足 macOS 特权 LaunchDaemon 签名要求。
+
 ## [1.1.2] - 2026-11-01
 
 ### 修复

@@ -63,9 +63,14 @@ final class PowerHelperClient {
     func uninstallHelper() async throws {
         switch service.status {
         case .enabled:
-            try await setSleepDisabled(false)
-            guard try await !isSleepDisabled() else {
-                throw PowerHelperManagementError.sleepStillBlocked
+            // A registered daemon may be unable to launch due to its signature.
+            // If normal sleep is already allowed, unregister without requiring XPC.
+            // Otherwise, attempt restoration through the helper and verify pmset.
+            if try !normalSleepIsAllowed() {
+                try await setSleepDisabled(false)
+                guard try normalSleepIsAllowed() else {
+                    throw PowerHelperManagementError.sleepStillBlocked
+                }
             }
 
         case .requiresApproval:
