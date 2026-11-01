@@ -40,6 +40,11 @@ jobs:
           HELPER="$APP/Contents/MacOS/app.macchiato.Macchiato.PowerHelper"
           test -d "$APP"
           test -x "$HELPER"
+          # The Debug build embeds an unsigned SwiftUI previews dylib.
+          # Sign nested Mach-O files before sealing the outer app.
+          if test -f "$APP/Contents/MacOS/__preview.dylib"; then
+            codesign --force --sign - "$APP/Contents/MacOS/__preview.dylib"
+          fi
           codesign --force --sign - "$HELPER"
           codesign --force --sign - "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
