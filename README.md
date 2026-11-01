@@ -23,7 +23,7 @@ Macchiato gives you a single menu bar switch:
 
 ## How To Use
 
-1. 从 [Releases](https://github.com/ruols/Macchiato/releases) 下载 **小工具.dmg**，拖动 App 到「应用程序」。
+1. 从 [Releases](https://github.com/ruols/Macchiato/releases) 下载 **SmallTools-v1.1.0-macOS.dmg**，拖动 App 到「应用程序」。
 2. 启动 **小工具**，点击菜单栏原有的咖啡杯图标。
 3. 使用原生开关操作 **保持唤醒** 或 **键盘清洁模式**。
 4. 键盘清洁模式首次使用需要 macOS 辅助功能权限，60 秒后自动解锁。

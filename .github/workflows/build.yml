@@ -113,15 +113,36 @@ jobs:
           set -euo pipefail
           test -f "dist/小工具.dmg"
           test -f "dist/小工具-macos.zip"
+          # GitHub sanitizes non-ASCII Release asset names. Keep the app's
+          # localized name inside the package, but publish ASCII file names.
+          cp "dist/小工具.dmg" "dist/SmallTools-v1.1.0-macOS.dmg"
+          cp "dist/小工具-macos.zip" "dist/SmallTools-v1.1.0-macOS.zip"
+
           if gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release v1.1.0 already exists; no duplicate publish."
-            exit 0
+            if gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+                 grep -Fxq "SmallTools-v1.1.0-macOS.dmg"; then
+              echo "Release v1.1.0 assets already published; no overwrite."
+              exit 0
+            fi
+            gh release upload "v1.1.0" \
+              "dist/SmallTools-v1.1.0-macOS.dmg" \
+              "dist/SmallTools-v1.1.0-macOS.zip" \
+              --repo "$GITHUB_REPOSITORY"
+            gh release edit "v1.1.0" --repo "$GITHUB_REPOSITORY" --notes-file RELEASE_NOTES.md
+            # Remove only the misnamed files after the replacements uploaded.
+            for old_asset in "default.dmg" "-macos.zip"; do
+              if gh release view "v1.1.0" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+                   grep -Fxq -- "$old_asset"; then
+                gh release delete-asset "v1.1.0" "$old_asset" --repo "$GITHUB_REPOSITORY" --yes
+              fi
+            done
+          else
+            gh release create "v1.1.0" \
+              "dist/SmallTools-v1.1.0-macOS.dmg" \
+              "dist/SmallTools-v1.1.0-macOS.zip" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "小工具 v1.1.0 (2)" \
+              --notes-file RELEASE_NOTES.md \
+              --prerelease
           fi
-          gh release create "v1.1.0" \
-            "dist/小工具.dmg" \
-            "dist/小工具-macos.zip" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "小工具 v1.1.0 (2)" \
-            --notes-file RELEASE_NOTES.md \
-            --prerelease
