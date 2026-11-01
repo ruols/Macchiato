@@ -11,14 +11,17 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     env:
-      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
     steps:
       - uses: actions/checkout@v4
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: Generate minimalist app icon
+        run: swift scripts/generate-app-icon.swift
 
       - name: Build macOS app
         run: |
@@ -57,13 +60,15 @@ jobs:
           set -euo pipefail
           APP="$RUNNER_TEMP/MacchiatoBuild/Build/Products/Debug/Macchiato.app"
           mkdir -p dist "$RUNNER_TEMP/MacchiatoDMG"
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "dist/Macchiato-Keyboard-Cleaning-macos.zip"
-          ditto "$APP" "$RUNNER_TEMP/MacchiatoDMG/Macchiato.app"
+          ditto "$APP" "dist/小工具.app"
+          ditto -c -k --sequesterRsrc --keepParent "dist/小工具.app" "dist/小工具-macos.zip"
+          ditto "dist/小工具.app" "$RUNNER_TEMP/MacchiatoDMG/小工具.app"
           ln -s /Applications "$RUNNER_TEMP/MacchiatoDMG/Applications"
-          hdiutil create -volname Macchiato -srcfolder "$RUNNER_TEMP/MacchiatoDMG" -ov -format UDZO "dist/Macchiato-Keyboard-Cleaning-macos.dmg"
-          hdiutil verify "dist/Macchiato-Keyboard-Cleaning-macos.dmg"
+          hdiutil create -volname "小工具" -srcfolder "$RUNNER_TEMP/MacchiatoDMG" -ov -format UDZO "dist/小工具.dmg"
+          hdiutil verify "dist/小工具.dmg"
+          rm -rf "dist/小工具.app"
           cat > dist/READ-ME-FIRST.txt <<'EOF'
-          Macchiato Keyboard Cleaning - TEST BUILD
+          小工具 - TEST BUILD
           Minimum macOS version: 14.0.
 
           This is an ad-hoc signed test build, not a Developer ID signed or notarized release.
@@ -82,7 +87,7 @@ jobs:
       - name: Upload installable test app
         uses: actions/upload-artifact@v4
         with:
-          name: Macchiato-macOS-App
+          name: SmallTools-macOS-App
           path: dist/
           if-no-files-found: error
           retention-days: 30
