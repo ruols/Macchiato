@@ -35,8 +35,11 @@ final class KeyboardLockManager {
             return
         }
 
-        let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged, .systemDefined]
-        let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
+        let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged]
+        // Quartz reserves event type 14 for system-defined (e.g. media-key) events.
+        // It is not an exposed named CGEventType case.
+        let systemDefinedMask = CGEventMask(1) << 14
+        let mask = types.reduce(systemDefinedMask) { $0 | (CGEventMask(1) << $1.rawValue) }
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -145,8 +148,10 @@ private func keyboardCleaningEventTap(
         return Unmanaged.passUnretained(event)
     }
 
+    if type.rawValue == 14 { return nil }
+
     switch type {
-    case .keyDown, .keyUp, .flagsChanged, .systemDefined:
+    case .keyDown, .keyUp, .flagsChanged:
         return nil
     default:
         return Unmanaged.passUnretained(event)
