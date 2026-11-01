@@ -28,8 +28,9 @@ struct MenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 12) {
-                Label("小工具", systemImage: "wrench.and.screwdriver")
-                    .font(.headline)
+                Text("小工具")
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
                 Spacer(minLength: 0)
 
