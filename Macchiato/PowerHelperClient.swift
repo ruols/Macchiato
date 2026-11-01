@@ -84,7 +84,7 @@ final class PowerHelperClient {
         }
 
         resetCurrentConnection()
-        try service.unregister()
+        try await service.unregister()
     }
 
     private func normalSleepIsAllowed() throws -> Bool {
