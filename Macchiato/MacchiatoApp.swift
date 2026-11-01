@@ -12,7 +12,7 @@ struct MacchiatoApp: App {
                 .environment(power)
                 .environment(keyboard)
         } label: {
-            Image(systemName: "wrench.and.screwdriver")
+            Image(systemName: power.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
                 .accessibilityLabel("小工具")
         }
         // The native menu-bar window supports real switches.
