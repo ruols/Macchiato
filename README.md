@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Macchiato/Assets.xcassets/MacchiatoBase.imageset/macchiato-base.png" width="64" height="64" alt="Macchiato logo" />
+  <img src="Macchiato/Assets.xcassets/AppIcon.appiconset/AppIcon-128@2x.png" width="96" height="96" alt="小工具 App 图标（工具箱）" />
 </p>
 
 <h1 align="center">小工具（Macchiato Fork）</h1>
@@ -14,7 +14,7 @@
 
 - **保持唤醒：** 使用 IOKit 电源断言，并通过系统级 Power Helper 调用 `pmset`，在启用时设置 `SleepDisabled = 1`，关闭时恢复为 `0`。合盖持续运行能力还应结合机型、供电和 macOS 行为进行实际测试。
 - **键盘清洁模式：** 临时屏蔽普通键盘输入，鼠标、触控板保持可用；可手动解锁，60 秒后自动解锁。需要 macOS「辅助功能」授权，**不依赖 Power Helper**。
-- **原生界面：** 菜单栏咖啡杯图标、原生开关、独立设置窗口及退出按钮。
+- **原生界面：** App 使用新的工具箱图标，菜单栏则继续使用咖啡杯图标；保留原生开关、独立设置窗口及退出按钮。
 - **可诊断的 Helper 管理：** 区分内嵌文件、系统注册与授权、XPC 实际通信状态；提供安装、卸载与在安全条件下修复注册的操作。
 
 **系统要求：** macOS 14 或更新版本。当前项目版本为 **1.1.4 (6)**。
