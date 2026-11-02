@@ -69,9 +69,9 @@ git checkout feature/keyboard-cleaning
 bash scripts/test-apple-development.sh
 ```
 
-脚本默认使用现有 Apple Development 签名 SHA-1 `C20B41BD6C06968B7A8154A02A67D3EB2792295C`。若以后证书更新，可在命令后指定新证书 SHA-1。生成的独立 Release 测试 App 保存在 `dist/AppleDevelopmentLocal/`。安装前先退出并备份已有 App，在设置中注销旧 Helper（系统已允许正常睡眠时可以在无 XPC 响应的情况下安全注销）。将新的测试 App 安装到 `/Applications/小工具.app` 后，再从设置安装 Helper 并批准。
+脚本默认使用现有 Apple Development 签名 SHA-1 `93A7B24B7972673159533F9B5B84DA46273806C8`。若以后证书更新，可在命令后指定新证书 SHA-1。生成的独立 Release 测试 App 保存在 `dist/AppleDevelopmentLocal/`。安装前先退出并备份已有 App，在设置中安全注销旧 Helper；新 App 安装到 `/Applications/小工具.app` 后，进入设置分别检查内嵌文件、SMAppService 注册授权和 XPC 真实连通状态。若显示已注册但通信失败，可在确认系统允许正常睡眠后使用“修复注册”重建服务。不应通过全局重置 BTM 作为常规安装流程。
 
-此步骤只验证开发证书能否被 macOS 接受，不保证免费 Personal Team 一定支持特权 LaunchDaemon。详见 [SIGNING.md](SIGNING.md)。
+该本地测试脚本会显式指定叶证书的签名要求，避免自生成 DR 校验失败；这只能验证签名，仍需实际测试 macOS 管理员批准、LaunchDaemon 启动和 XPC 通信。免费 Apple Development 是否可在这台 Mac 上成功启动特权服务尚待验收。详见 [SIGNING.md](SIGNING.md) 及其中的 Apple 官方参考。
 
 ## 更新日志
 
