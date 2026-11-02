@@ -2,6 +2,19 @@
 
 所有版本的显著改动记录于此。版本号遵循 `主版本.次版本.修订版本`。
 
+## [1.1.4] - 2026-11-02
+
+### Helper 注册与恢复
+- 将 Helper 内嵌文件检查、SMAppService 注册/授权状态和真正的 XPC 可用性分开呈现，不再把 `enabled` 当作 Helper 已运行的证据。
+- 增加明确的“修复注册”入口：仅在用户触发时检查 `pmset`、注销旧登记并重新注册，禁止睡眠未恢复则拒绝操作；不触碰其他 App 的后台项目记录。
+- 添加独立的只读 XPC 健康探测和超时，暴露 NSError domain/code 便于区分签名、服务登记和通信问题。
+- XPC 在免费开发签名无 TeamIdentifier 时绑定同一签名叶证书，避免退化成仅凭 Bundle ID 验证；Ad-hoc Release 情况下无证书则拒绝信任。
+
+### 本地签名与说明
+- 修正 Apple Development 本地签名脚本中的 designated requirement，将叶证书作为 leaf 而非 root；签名校验通过不代表 LaunchDaemon 一定能启动。
+- 补充 Apple 官方 SMAppService / Developer ID 与免费本机开发测试的区别和验收步骤。
+- 版本更新至 1.1.4 (6)；保留原有功能和 GitHub Actions 既有密钥配置。
+
 ## [1.1.3] - 2026-11-01
 
 ### 开发测试
