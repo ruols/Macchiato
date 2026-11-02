@@ -68,14 +68,18 @@ jobs:
             security set-key-partition-list -S apple-tool:,apple:,codesign: \
               -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
 
-            # The runner uses an isolated temporary keychain: import the owner's
-            # self-signed root with trust restricted to the code-signing policy.
-            security find-certificate -a -p "$KEYCHAIN" > "$RUNNER_TEMP/code-signing-cert.pem"
-            test -s "$RUNNER_TEMP/code-signing-cert.pem"
-            # Trust settings in unattended macOS runners require admin scope.
-            # Restrict this to the codeSign policy; never trust SSL/email use.
-            # A hard timeout prevents an authorization dialog hanging CI forever.
-            python3 - "$KEYCHAIN" "$RUNNER_TEMP/code-signing-cert.pem" <<'PY'
+            # Apple Development certificates already chain to Apple Root CA.
+            # Only self-signed identities need explicit local code-signing trust.
+            CERT_PEM="$RUNNER_TEMP/code-signing-cert.pem"
+            security find-certificate -a -p "$KEYCHAIN" > "$CERT_PEM"
+            test -s "$CERT_PEM"
+            CERT_SUBJECT="$(openssl x509 -in "$CERT_PEM" -noout -subject | sed 's/^subject= *//')"
+            CERT_ISSUER="$(openssl x509 -in "$CERT_PEM" -noout -issuer | sed 's/^issuer= *//')"
+            SIGNING_ANCHOR=" and anchor apple generic"
+            if [[ "$CERT_SUBJECT" == "$CERT_ISSUER" ]]; then
+              echo "Self-signed identity detected; configuring code-signing-only trust."
+              SIGNING_ANCHOR=""
+              python3 - "$KEYCHAIN" "$CERT_PEM" <<'PY'
           import subprocess
           import sys
 
@@ -91,25 +95,45 @@ jobs:
               print(f"::error::Cannot configure self-signed code-signing trust: {error}", flush=True)
               sys.exit(1)
           PY
-            rm -f "$RUNNER_TEMP/code-signing-cert.pem" "$RUNNER_TEMP/certificate.p12"
+            else
+              echo "CA-issued certificate detected; using trusted system certificate chain."
+            fi
+            rm -f "$CERT_PEM" "$RUNNER_TEMP/certificate.p12"
 
-            # Explain any identity mismatch rather than failing an opaque grep.
+            # Resolve the actual leaf SHA-1, whether the Secret holds a name or a hash.
             identities="$(security find-identity -v -p codesigning "$KEYCHAIN")"
-            if ! printf '%s\\n' "$identities" | grep -Fq "$SIGN_IDENTITY"; then
-              echo "$identities"
-              echo "::error::Expected signing identity is not trusted or doesn't match SMALLTOOLS_SIGN_IDENTITY."
+            identity_line="$(printf '%s\n' "$identities" | grep -F "$SIGN_IDENTITY" | head -n 1 || true)"
+            if [[ -z "$identity_line" ]]; then
+              echo "::error::Configured signing identity is unavailable or not trusted."
+              echo "Check that all three Secrets belong to the same exported PKCS#12 identity."
               exit 1
             fi
+            identity_sha="$(awk '{print $2}' <<< "$identity_line")"
+            if [[ ! "$identity_sha" =~ ^[[:xdigit:]]{40}$ ]]; then
+              echo "::error::Cannot resolve the SHA-1 fingerprint of the signing identity."
+              exit 1
+            fi
+
+            # Explicit leaf-bound DR avoids codesign guessing 'certificate root =
+            # <development leaf>' on a Personal Team Apple Development identity.
+            # Keep the same SHA-1 for main App and privileged helper.
+            APP_DR="=designated => identifier \"app.macchiato.Macchiato\"${SIGNING_ANCHOR} and certificate leaf = H\"$identity_sha\""
+            HELPER_DR="=designated => identifier \"app.macchiato.Macchiato.PowerHelper\"${SIGNING_ANCHOR} and certificate leaf = H\"$identity_sha\""
             for dylib in "$APP"/Contents/MacOS/*.dylib; do
               if test -f "$dylib"; then
                 codesign --force --options runtime --timestamp=none \
-                  --sign "$SIGN_IDENTITY" --keychain "$KEYCHAIN" "$dylib"
+                  --sign "$identity_sha" --keychain "$KEYCHAIN" "$dylib"
               fi
             done
             codesign --force --options runtime --timestamp=none \
-              --sign "$SIGN_IDENTITY" --keychain "$KEYCHAIN" "$HELPER"
+              --identifier "app.macchiato.Macchiato.PowerHelper" \
+              --requirements "$HELPER_DR" \
+              --sign "$identity_sha" --keychain "$KEYCHAIN" "$HELPER"
+            codesign --verify --strict --verbose=2 "$HELPER"
             codesign --force --options runtime --timestamp=none \
-              --sign "$SIGN_IDENTITY" --keychain "$KEYCHAIN" "$APP"
+              --identifier "app.macchiato.Macchiato" \
+              --requirements "$APP_DR" \
+              --sign "$identity_sha" --keychain "$KEYCHAIN" "$APP"
             codesign -dv --verbose=2 "$APP" 2>&1 | grep -E 'Authority=|TeamIdentifier=' || true
           elif [[ -z "$CERT_P12_BASE64" && -z "$CERT_P12_PASSWORD" && -z "$SIGN_IDENTITY" ]]; then
             echo "::warning::No persistent signing certificate. Ad-hoc builds may lose Accessibility permission after updates."
@@ -144,12 +168,12 @@ jobs:
           hdiutil verify "dist/小工具.dmg"
           rm -rf "dist/小工具.app"
           cat > dist/READ-ME-FIRST.txt <<'EOF'
-          小工具 v1.1.2 (4) - SELF-SIGNED TEST BUILD
+          小工具 v1.1.4 (6) - LOCAL TEST BUILD
           Minimum macOS version: 14.0.
 
-          This is a locally signed test build, not an Apple notarized release.
-          When the persistent certificate Secrets are configured, it uses your
-          own long-lived code-signing certificate. Otherwise it uses ad-hoc signing.
+          This build is NOT Apple notarized or suitable for general distribution.
+          When signing Secrets are configured, it uses the imported identity
+          (e.g. Apple Development for local testing), otherwise ad-hoc signing.
           macOS Gatekeeper may require you to approve the app through
           System Settings > Privacy & Security > Open Anyway.
 
@@ -158,8 +182,9 @@ jobs:
 
           IMPORTANT: Keep Awake relies on a privileged SMAppService LaunchDaemon helper.
           The helper still requires macOS service-management approval.
-          Self-signed signing does NOT guarantee privileged daemon registration,
-          and does not replace a Developer ID signature or Apple notarization.
+          Apple Development was verified locally, but updates may need daemon
+          re-registration; self-signed signing does not guarantee daemon launch.
+          Neither method replaces Developer ID signing or Apple notarization.
           EOF
 
       - name: Upload installable test app
