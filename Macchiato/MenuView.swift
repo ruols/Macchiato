@@ -3,194 +3,164 @@ import SwiftUI
 
 @MainActor
 struct MenuView: View {
+    @Environment(\.openSettings) private var openSettings
     @Environment(PowerManager.self) private var power
+    @Environment(KeyboardLockManager.self) private var keyboard
 
-    var body: some View {
-        VStack(spacing: 14) {
-            header
-            awakeToggle
-            statusArea
-            footer
-        }
-        .padding(16)
-        .frame(width: 340)
-        .background(.regularMaterial)
+    private var powerBinding: Binding<Bool> {
+        Binding(
+            get: { power.isActive },
+            set: { enabled in
+                guard !power.isChanging else { return }
+                Task { await power.setActive(enabled) }
+            }
+        )
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            Image("MacchiatoBase")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 34, height: 34)
-                .clipShape(Circle())
-                .frame(width: 34, height: 34)
+    private var keyboardBinding: Binding<Bool> {
+        Binding(
+            get: { keyboard.isLocked },
+            set: { enabled in
+                if enabled { keyboard.lock() } else { keyboard.unlock() }
+            }
+        )
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Macchiato")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.primary)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                Text("小工具")
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
-                Text(power.isActive ? "Keeping this Mac awake" : "Normal sleep behavior")
-                    .font(.system(size: 12, weight: .medium))
+                Spacer(minLength: 0)
+
+                Button {
+                    openSettings()
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 15))
+                        .frame(width: 28, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("设置")
+                .accessibilityLabel("打开设置")
+
+                quitButton
+            }
+
+            VStack(spacing: 20) {
+                settingRow(
+                    "保持唤醒",
+                    subtitle: "阻止 Mac 进入系统睡眠",
+                    symbol: "moon.zzz",
+                    isOn: powerBinding,
+                    isDisabled: power.isChanging
+                )
+
+                settingRow(
+                    "键盘清洁模式",
+                    subtitle: "临时屏蔽键盘输入",
+                    symbol: "keyboard",
+                    isOn: keyboardBinding
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if power.isChanging {
+                Label("正在更新睡眠设置…", systemImage: "clock")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            if let error = power.lastError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if needsHelperApproval {
+                    Button("打开系统设置") { power.openHelperApprovalSettings() }
+                }
+            }
+
+            if keyboard.isLocked {
+                Label("键盘将在 \(keyboard.secondsRemaining) 秒后自动恢复", systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let error = keyboard.lastError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if keyboard.needsAccessibilityPermission {
+                    Button("打开辅助功能设置") { keyboard.openAccessibilitySettings() }
+                }
+            }
         }
+        .padding(16)
+        .frame(width: 320)
     }
 
-    private var awakeToggle: some View {
-        Button {
-            guard !power.isChanging else { return }
+    /// Keep each row full-width. Toggle's intrinsic label layout otherwise
+    /// moves the icon and switch depending on the length of Chinese text.
+    private func settingRow(
+        _ title: String,
+        subtitle: String,
+        symbol: String,
+        isOn: Binding<Bool>,
+        isDisabled: Bool = false
+    ) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 16))
+                .frame(width: 26)
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .disabled(isDisabled)
+                .accessibilityLabel(title)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var quitButton: some View {
+        Button {
             Task {
-                await power.setActive(!power.isActive)
+                keyboard.unlock()
+                await power.disable()
+                if !power.isActive {
+                    NSApplication.shared.terminate(nil)
+                }
             }
         } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(power.isActive ? Color.brown.opacity(0.18) : Color.secondary.opacity(0.16))
-
-                    Image(systemName: power.isActive ? "moon.zzz.fill" : "moon.zzz")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(power.isActive ? Color.brown : Color.secondary)
-                }
-                .frame(width: 50, height: 50)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Keep Awake")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-
-                    Text(power.isActive ? "Sleep is blocked" : "Prevent Mac sleep")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-                }
-
-                Spacer(minLength: 6)
-
-                TogglePill(isOn: power.isActive, isBusy: power.isChanging)
-            }
-            .padding(13)
-            .frame(maxWidth: .infinity, minHeight: 88)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(power.isActive ? Color.brown.opacity(0.22) : Color.white.opacity(0.36))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.white.opacity(power.isActive ? 0.38 : 0.5), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
-            .animation(.easeInOut(duration: 0.22), value: power.isActive)
+            Image(systemName: "power")
+                .font(.system(size: 16, weight: .regular))
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var statusArea: some View {
-        HStack(spacing: 8) {
-            Image(systemName: power.lastError == nil ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(statusColor)
-
-            Text(power.lastError ?? "Applying system sleep setting...")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(statusColor)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
-
-            if needsHelperApproval {
-                Button("Open Settings") {
-                    power.openHelperApprovalSettings()
-                }
-                .font(.system(size: 11, weight: .semibold))
-                .buttonStyle(.borderless)
-            }
-        }
-        .padding(.horizontal, 2)
-        .frame(minHeight: 18)
-        .opacity(showsStatus ? 1 : 0)
-        .allowsHitTesting(showsStatus)
-        .accessibilityHidden(!showsStatus)
-    }
-
-    private var showsStatus: Bool {
-        power.isChanging || power.lastError != nil
+        .keyboardShortcut("q")
+        .accessibilityLabel("退出小工具")
+        .help("退出小工具")
     }
 
     private var needsHelperApproval: Bool {
-        guard let lastError = power.lastError else {
-            return false
-        }
-
-        return lastError == "Approve Macchiato Helper in System Settings, then try again."
-            || lastError.contains("Approve the helper")
-    }
-
-    private var statusColor: Color {
-        power.lastError == nil ? .secondary : .red
-    }
-
-    private var footer: some View {
-        HStack {
-            Text("Menu bar utility")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-
-            Spacer()
-
-            Button {
-                Task {
-                    await power.disable()
-                    if !power.isActive {
-                        NSApplication.shared.terminate(nil)
-                    }
-                }
-            } label: {
-                Label("Quit", systemImage: "power")
-                    .font(.system(size: 12, weight: .semibold))
-                    .labelStyle(.titleAndIcon)
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut("q")
-        }
-    }
-}
-
-private struct TogglePill: View {
-    let isOn: Bool
-    let isBusy: Bool
-
-    var body: some View {
-        ZStack(alignment: isOn ? .trailing : .leading) {
-            Capsule()
-                .fill(isOn ? Color.brown : Color.secondary.opacity(0.22))
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.45), lineWidth: 1)
-                )
-
-            Circle()
-                .fill(.white)
-                .frame(width: 26, height: 26)
-                .padding(3)
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-                .overlay {
-                    if isBusy {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-        }
-        .frame(width: 52, height: 32)
-        .animation(.spring(response: 0.26, dampingFraction: 0.82), value: isOn)
+        guard let error = power.lastError else { return false }
+        return error == "Approve Macchiato Helper in System Settings, then try again."
+            || error.contains("Approve the helper")
     }
 }
