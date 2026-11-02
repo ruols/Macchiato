@@ -4,17 +4,46 @@
 
 ## 使用现有免费 Apple Development 证书进行本机试验
 
-你的 Mac 已有 Apple Development 开发证书（SHA-1：`C20B41BD6C06968B7A8154A02A67D3EB2792295C`）。在本机运行：
+你的 Mac 已有 Apple Development 开发证书（本地测试默认证书 SHA-1：`93A7B24B7972673159533F9B5B84DA46273806C8`）。在本机运行：
 
 ```bash
 bash scripts/test-apple-development.sh
 ```
 
-它会使用本机 Keychain 中的身份编译 Release 并签名主 App、Power Helper，然后验证签名和 TeamIdentifier。输出到被 Git 忽略的 `dist/AppleDevelopmentLocal/`，**不导出任何证书、私钥或验证码，不修改 GitHub Secrets，也不覆盖旧 App**。证书到期或更换后可将新 SHA-1 作为第一个参数。
+它会使用本机 Keychain 中的身份编译 Release 并签名主 App、Power Helper，然后通过显式指定叶证书 DR 验证主 App 与 Helper 的完整签名。`TeamIdentifier=not set` 会显示警告，而非误报文件签名失败。输出到被 Git 忽略的 `dist/AppleDevelopmentLocal/`，**不导出任何证书、私钥或验证码，不修改 GitHub Secrets，也不覆盖旧 App**。证书到期或更换后可将新 SHA-1 作为第一个参数。
 
 如果 Xcode 提示 Apple ID 需要验证，在你自己的 Mac 的 **Xcode → 设置 → Accounts** 中操作即可。免费账号的描述文件可能有 7 天限制；Apple Development 证书有效期是另一个概念。
 
 请先退出旧版 App，备份旧 App 到 `/Applications` 以外的目录，尽量通过「设置 → 卸载 Helper」注销旧服务后再手动安装新 App 到 `/Applications/小工具.app`。新 App 上安装 Helper 后检查 `sudo launchctl print system/app.macchiato.Macchiato.PowerHelper` 和签名拒绝日志。**Apple Development 证书不是 Developer ID，能否通过特权服务校验需要实测。**
+
+## Apple 官方要求：免费 Apple Development 与特权 Helper
+
+- Apple 的 [Getting Started with SMAppService](https://developer.apple.com/forums/thread/802443) 给出了在 Xcode 中编译、注册 LaunchDaemon、由管理员批准的完整开发流程，**没有将付费 Developer ID 写成开发测试的前置条件**。
+- Apple 官方 [register() 文档](https://developer.apple.com/documentation/servicemanagement/smappservice/register%28%29) 指明：LaunchDaemon 注册后，需要管理员批准；`enabled` 只表示有资格运行，不保证 XPC 已连接。
+- Apple DTS 在 [相关论坛回复](https://developer.apple.com/forums/thread/799910) 特别指出：主 App 和内嵌 Helper 应当使用**同一个 Apple 签发的代码签名身份**，ad-hoc 签名可能导致注册、重启时异常。
+- Apple 的 [独立分发签名文档](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/) 与 [公证要求](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) 要求 Developer ID；**免费的 Apple Development 不是用于独立分发、公证的替代品**。
+- 因此：本机使用免费 Apple Development **可以进行构建、签名、注册测试**，但 Mac 上能否实际获批启动 root 级 LaunchDaemon 必须实测。当前系统曾报告 `TeamIdentifier=not set`，不能用 `codesign --verify` 成功替代启动结论。
+
+### 新版 Helper 安装 / 修复逻辑
+
+- **内嵌文件：** 先检查可执行 Helper 和 LaunchDaemon plist 的路径与关键字段。
+- **注册与授权：** 按 `SMAppService.status` 分辨未注册、待批准、可运行与找不到服务。
+- **真实可用性：** 独立进行只读 XPC 健康检查；只收到 Helper 回复才显示“通信正常”。
+- **修复注册：** 仅由用户主动触发。在确认 `pmset -g live` 不再禁止睡眠后，通过 `SMAppService.unregister()` 再 `register()` 重建登记。不会调用 `launchctl bootstrap`、不会直接编辑后台项目数据库，也不会自动全局 `sfltool resetbtm`。
+- **可诊断错误：** 保留 ServiceManagement / XPC 原始 NSError domain 和 code；“已注册但无法运行”不再被误显示为“已安装并启用”。
+- 不要同时启动上游原版 Macchiato 与此分支：它们共享 Bundle ID、Daemon label 与 Mach service 名称，容易相互干扰。
+
+## 故障定位
+
+在 App 的“Helper 设置”窗口查看“内嵌文件 / 注册与授权 / XPC 通信”三项。
+如果提示“注册与授权：已注册”但“XPC 通信：无法连接”，检查系统服务：
+
+```bash
+sudo launchctl print system/app.macchiato.Macchiato.PowerHelper
+sudo log show --last 10m --info --style compact --predicate 'eventMessage CONTAINS[c] "app.macchiato.Macchiato.PowerHelper"' | tail -60
+```
+
+如果签名被 AMFI 拒绝，先修签名；如果系统仍在等待批准，使用 App 内的“打开登录项与扩展”；如果已批准但失联，使用“修复注册”，并根据错误域与错误码继续定位。不要将 `sfltool resetbtm` 当作常规安装步骤。
 
 ## 不付费的方案：固定的自签名代码签名证书
 
