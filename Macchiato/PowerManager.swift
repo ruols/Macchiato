@@ -29,8 +29,25 @@ final class PowerManager {
         helper.registrationStatus
     }
 
+    var helperBundleIssue: String? {
+        helper.bundledHelperIssue
+    }
+
+    func checkHelperConnectivity() async -> PowerHelperConnectivity {
+        await helper.checkConnectivity()
+    }
+
     func installHelper() throws {
         try helper.installHelper()
+    }
+
+    func repairHelper() async throws {
+        guard !isChanging else { throw PowerHelperManagementError.busy }
+        if isActive {
+            await disable()
+            guard !isActive else { throw PowerHelperManagementError.sleepStillBlocked }
+        }
+        try await helper.repairHelper()
     }
 
     func uninstallHelper() async throws {
