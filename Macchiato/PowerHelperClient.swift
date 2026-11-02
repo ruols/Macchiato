@@ -10,7 +10,7 @@ enum PowerHelperRegistrationStatus: Equatable {
 
     var title: String {
         switch self {
-        case .enabled: return "已安装并启用"
+        case .enabled: return "已登记，允许启动"
         case .requiresApproval: return "等待系统批准"
         case .notInstalled: return "未安装"
         case .missingService: return "内嵌服务未找到"
