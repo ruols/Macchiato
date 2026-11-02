@@ -12,6 +12,7 @@
 
 ### App 图标
 - 重新绘制深青色爱心工具箱图标，同步更新 `AppIcon.appiconset` 的全部 10 个 PNG 文件与图标生成脚本；菜单栏咖啡杯图标保持不变。
+- 为确保新图标更新包能够与已安装版本区分，构建号升至 **1.1.4 (7)**，营销版本仍为 1.1.4。
 
 ### 本地签名与说明
 - 修正 Apple Development 本地签名脚本中的 designated requirement，将叶证书作为 leaf 而非 root；签名校验通过不代表 LaunchDaemon 一定能启动。
