@@ -10,6 +10,9 @@
 - 添加独立的只读 XPC 健康探测和超时，暴露 NSError domain/code 便于区分签名、服务登记和通信问题。
 - XPC 在免费开发签名无 TeamIdentifier 时绑定同一签名叶证书，避免退化成仅凭 Bundle ID 验证；Ad-hoc Release 情况下无证书则拒绝信任。
 
+### App 图标
+- 重新绘制深青色爱心工具箱图标，同步更新 `AppIcon.appiconset` 的全部 10 个 PNG 文件与图标生成脚本；菜单栏咖啡杯图标保持不变。
+
 ### 本地签名与说明
 - 修正 Apple Development 本地签名脚本中的 designated requirement，将叶证书作为 leaf 而非 root；签名校验通过不代表 LaunchDaemon 一定能启动。
 - 补充 Apple 官方 SMAppService / Developer ID 与免费本机开发测试的区别和验收步骤。
