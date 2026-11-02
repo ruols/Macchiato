@@ -1,6 +1,19 @@
 # 小工具：长期稳定签名
 
-当前 GitHub Actions 支持固定自签名证书，未设置三项 Repository Secrets 时使用 Ad-hoc。需要注意：**自签名证书可用于普通 App，但在 macOS 上可能无法通过特权 LaunchDaemon 的启动约束校验。**
+当前 GitHub Actions 支持 Apple Development 和固定自签名证书，未设置三项 Repository Secrets 时使用 Ad-hoc。需要注意：**自签名证书可用于普通 App，但在 macOS 上可能无法通过特权 LaunchDaemon 的启动约束校验。**
+
+## 将已验证可用的 Apple Development 证书用于 GitHub Actions
+
+本机已验证的签名身份是 `Apple Development: jsnjycwyz@gmail.com (W682PV296P)`（SHA-1：`93A7B24B7972673159533F9B5B84DA46273806C8`）。
+此证书已在本机通过 SMAppService LaunchDaemon 启动、XPC 通信以及 `pmset` 开关测试；不等于具有 Developer ID 公证能力。
+
+1. 在 Mac **Xcode → Settings → Accounts → 对应 Apple Account → Manage Certificates**，右键 Apple Development 证书，选择 **Export Certificate**，导出带私钥且有强密码保护的 `.p12`。也可以在“钥匙串访问”的“我的证书”里导出带私钥的身份。
+2. 在 Mac 上执行 `base64 -i "/path/to/AppleDevelopment.p12" | tr -d '\\n' | pbcopy`，将 Base64 粘贴到仓库 `Settings → Secrets and variables → Actions` 中的 `SMALLTOOLS_CERT_P12_BASE64`，**只在 GitHub Secrets 页面粘贴**。
+3. 将刚才为 P12 设置的密码写入 `SMALLTOOLS_CERT_P12_PASSWORD`，将上述 SHA-1 写入 `SMALLTOOLS_SIGN_IDENTITY`；更新已有同名 Secret，不要在仓库提交 P12、密码或 Base64。
+4. 在仓库 Actions 页手动运行 `Build` 工作流（`feature/keyboard-cleaning` 分支），检查 `Sign app and bundled helper` 步骤。
+5. 此工作流会只对自签名证书额外设置信任。Apple Development 证书走系统 Apple 根证书链，同时给 App/Helper 写入与本机成功测试一致的显式 leaf SHA-1 DR。构建校验通过后，再在自己的 Mac 上注销旧 Helper、安装更新包并重新注册，检查 XPC 和 `SleepDisabled`。
+
+**注意安全：** `.p12` 包含签名私钥。存储在 GitHub Actions Secrets 意味着信任 GitHub 托管构建环境与有工作流写入权限的人；对公开仓库尤其需要保护工作流修改权限。不想把私钥放在云端时，继续在本机签名即可。导出的 P12 应妥善加密保管或安全删除，并及时清理剪贴板。
 
 ## 使用现有免费 Apple Development 证书进行本机试验
 
